@@ -208,7 +208,8 @@ exports.searchMovies = catchAsync(async (req, res) => {
  */
 exports.getTrendingMovies = catchAsync(async (req, res) => {
   const { userId } = req.query;
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  // Expand time range to get more movies (last 90 days instead of 30)
+  const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
 
   // Get user's favorite genre if userId is provided
   let userFavoriteGenre = null;
@@ -252,10 +253,10 @@ exports.getTrendingMovies = catchAsync(async (req, res) => {
 
   // Build aggregation pipeline
   const pipeline = [
-    // Stage 1: Filter last 30 days
+    // Stage 1: Filter last 90 days for more variety
     {
       $match: {
-        timestamp: { $gte: thirtyDaysAgo }
+        timestamp: { $gte: ninetyDaysAgo }
       }
     },
     // Stage 2: Group by movie and calculate stats
@@ -329,17 +330,55 @@ exports.getTrendingMovies = catchAsync(async (req, res) => {
         watchCount: -1 
       } 
     },
-    // Limit to top 5
-    { $limit: 5 }
+    // Limit to top 20 for better variety
+    { $limit: 20 }
   );
 
-  const trending = await WatchHistory.aggregate(pipeline);
+  let trending = await WatchHistory.aggregate(pipeline);
+
+  // If we don't have enough trending movies from watch history, supplement with popular movies
+  if (trending.length < 20) {
+    const Movie = require('../models/Movie');
+    const popularMovies = await Movie.find({})
+      .sort({ watchCount: -1, rating: -1 })
+      .limit(20 - trending.length)
+      .lean();
+
+    // Convert popular movies to trending format
+    const popularTrending = popularMovies.map(movie => ({
+      _id: movie._id,
+      title: movie.title,
+      posterUrl: movie.posterUrl,
+      rating: movie.rating,
+      genres: movie.genres,
+      releaseYear: movie.releaseYear,
+      watchCount: movie.watchCount || 0,
+      uniqueViewers: 1,
+      avgWatchTime: 0,
+      genreMatch: userFavoriteGenre && movie.genres && movie.genres.includes(userFavoriteGenre) ? 1 : 0
+    }));
+
+    // Combine trending and popular movies, removing duplicates
+    const trendingIds = new Set(trending.map(m => m._id.toString()));
+    const uniquePopular = popularTrending.filter(m => !trendingIds.has(m._id.toString()));
+    
+    trending = [...trending, ...uniquePopular];
+    
+    // Re-sort the combined list
+    trending.sort((a, b) => {
+      if (a.genreMatch !== b.genreMatch) return b.genreMatch - a.genreMatch;
+      return b.watchCount - a.watchCount;
+    });
+    
+    // Limit to 20
+    trending = trending.slice(0, 20);
+  }
 
   res.status(200).json({
     success: true,
     data: {
       trending,
-      period: 'Last 30 days',
+      period: 'Last 90 days',
       personalized: userId ? true : false,
       userFavoriteGenre: userFavoriteGenre,
       filteredOutWatched: userWatchedMovies.length
