@@ -80,22 +80,35 @@ exports.searchMovies = catchAsync(async (req, res) => {
     };
   });
 
-  // Sort by relevance: title matches first, then director, then cast, then by hybrid score
+  // Sort by relevance: title starts with query, title contains query, director, cast, then hybrid score
   moviesWithScores.sort((a, b) => {
-    const aTitleMatch = a.title.toLowerCase().includes(queryLower);
-    const bTitleMatch = b.title.toLowerCase().includes(queryLower);
+    const queryLower = query.toLowerCase();
+    
+    // Check for title starting with query
+    const aTitleStarts = a.title.toLowerCase().startsWith(queryLower);
+    const bTitleStarts = b.title.toLowerCase().startsWith(queryLower);
+    
+    // Check for title containing query
+    const aTitleContains = a.title.toLowerCase().includes(queryLower);
+    const bTitleContains = b.title.toLowerCase().includes(queryLower);
+    
+    // Check for director matches
     const aDirectorMatch = a.director && a.director.toLowerCase().includes(queryLower);
     const bDirectorMatch = b.director && b.director.toLowerCase().includes(queryLower);
     
-    // Title matches get highest priority
-    if (aTitleMatch && !bTitleMatch) return -1;
-    if (!aTitleMatch && bTitleMatch) return 1;
+    // Priority 1: Title starts with query
+    if (aTitleStarts && !bTitleStarts) return -1;
+    if (!aTitleStarts && bTitleStarts) return 1;
     
-    // Then director matches
+    // Priority 2: Title contains query (but doesn't start with it)
+    if (aTitleContains && !bTitleContains) return -1;
+    if (!aTitleContains && bTitleContains) return 1;
+    
+    // Priority 3: Director matches
     if (aDirectorMatch && !bDirectorMatch) return -1;
     if (!aDirectorMatch && bDirectorMatch) return 1;
     
-    // Then by hybrid score
+    // Priority 4: Hybrid score
     return b.hybridScore - a.hybridScore;
   });
 
