@@ -175,12 +175,15 @@ async function performSearch(page = 1) {
       limit: 12
     });
 
+    // Add userId for personalized search
+    if (currentUserId) params.append('userId', currentUserId);
+    
     if (genreFilter.value) params.append('genre', genreFilter.value);
     if (minRatingInput.value) params.append('minRating', minRatingInput.value);
 
     const data = await apiRequest(`/movies/search?${params}`);
     
-    displaySearchResults(data.data.movies);
+    displaySearchResults(data.data.movies, data.data.userFavoriteGenre, data.data.personalized);
     displayPagination(data.data.pagination, 'search');
   } catch (error) {
     searchResults.innerHTML = '<div class="empty-state"><h3>Search failed. Please try again.</h3></div>';
@@ -189,13 +192,26 @@ async function performSearch(page = 1) {
   }
 }
 
-function displaySearchResults(movies) {
+function displaySearchResults(movies, userFavoriteGenre, personalized) {
   if (movies.length === 0) {
     searchResults.innerHTML = '<div class="empty-state"><h3>No movies found</h3><p>Try a different search term</p></div>';
     return;
   }
 
-  searchResults.innerHTML = movies.map(movie => `
+  // Show personalized search info if available
+  if (personalized && userFavoriteGenre) {
+    const personalizedInfo = document.createElement('div');
+    personalizedInfo.className = 'personalized-info';
+    personalizedInfo.innerHTML = `
+      <div style="background: var(--primary-color); color: white; padding: 10px; border-radius: 5px; margin-bottom: 20px; text-align: center;">
+        🎯 Personalized for you: Prioritizing <strong>${userFavoriteGenre}</strong> movies
+      </div>
+    `;
+    searchResults.innerHTML = '';
+    searchResults.appendChild(personalizedInfo);
+  }
+
+  const moviesHtml = movies.map(movie => `
     <div class="movie-card" onclick="showMovieDetails('${movie._id}')">
       ${movie.posterUrl 
         ? `<img src="${movie.posterUrl}" alt="${movie.title}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
@@ -215,6 +231,13 @@ function displaySearchResults(movies) {
       </div>
     </div>
   `).join('');
+  
+  // Add movies to the results (either append to personalized info or replace)
+  if (personalized && userFavoriteGenre) {
+    searchResults.innerHTML += moviesHtml;
+  } else {
+    searchResults.innerHTML = moviesHtml;
+  }
 }
 
 // Trending Movies

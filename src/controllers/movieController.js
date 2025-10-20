@@ -10,10 +10,40 @@ const { calculateHybridScore, filterByGenre, filterByRating, paginate } = requir
  * GET /api/movies/search
  */
 exports.searchMovies = catchAsync(async (req, res) => {
-  const { query, genre, minRating, page = 1, limit = 10 } = req.query;
+  const { query, genre, minRating, page = 1, limit = 10, userId } = req.query;
 
   if (!query) {
     throw new AppError('Search query is required', 400);
+  }
+
+  // Get user's favorite genre if userId is provided
+  let userFavoriteGenre = null;
+  if (userId) {
+    const userStats = await WatchHistory.aggregate([
+      { $match: { userId: new mongoose.Types.ObjectId(userId) } },
+      {
+        $lookup: {
+          from: 'movies',
+          localField: 'movieId',
+          foreignField: '_id',
+          as: 'movie'
+        }
+      },
+      { $unwind: '$movie' },
+      { $unwind: '$movie.genres' },
+      {
+        $group: {
+          _id: '$movie.genres',
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1 } },
+      { $limit: 1 }
+    ]);
+
+    if (userStats.length > 0) {
+      userFavoriteGenre = userStats[0]._id;
+    }
   }
 
   // Build search query with filters integrated - STRICT matching
@@ -80,9 +110,13 @@ exports.searchMovies = catchAsync(async (req, res) => {
     };
   });
 
-  // Sort by relevance: title starts with query, title contains query, director, cast, then hybrid score
+  // Sort by relevance: user's favorite genre, title starts with query, title contains query, director, cast, then hybrid score
   moviesWithScores.sort((a, b) => {
     const queryLower = query.toLowerCase();
+    
+    // Check for user's favorite genre match
+    const aFavoriteGenre = userFavoriteGenre && a.genres && a.genres.includes(userFavoriteGenre);
+    const bFavoriteGenre = userFavoriteGenre && b.genres && b.genres.includes(userFavoriteGenre);
     
     // Check for title starting with query
     const aTitleStarts = a.title.toLowerCase().startsWith(queryLower);
@@ -96,19 +130,31 @@ exports.searchMovies = catchAsync(async (req, res) => {
     const aDirectorMatch = a.director && a.director.toLowerCase().includes(queryLower);
     const bDirectorMatch = b.director && b.director.toLowerCase().includes(queryLower);
     
-    // Priority 1: Title starts with query
+    // Priority 1: User's favorite genre + title starts with query
+    if (aFavoriteGenre && aTitleStarts && !(bFavoriteGenre && bTitleStarts)) return -1;
+    if (bFavoriteGenre && bTitleStarts && !(aFavoriteGenre && aTitleStarts)) return 1;
+    
+    // Priority 2: User's favorite genre + title contains query
+    if (aFavoriteGenre && aTitleContains && !(bFavoriteGenre && bTitleContains)) return -1;
+    if (bFavoriteGenre && bTitleContains && !(aFavoriteGenre && aTitleContains)) return 1;
+    
+    // Priority 3: User's favorite genre (any text match)
+    if (aFavoriteGenre && !bFavoriteGenre) return -1;
+    if (bFavoriteGenre && !aFavoriteGenre) return 1;
+    
+    // Priority 4: Title starts with query
     if (aTitleStarts && !bTitleStarts) return -1;
     if (!aTitleStarts && bTitleStarts) return 1;
     
-    // Priority 2: Title contains query (but doesn't start with it)
+    // Priority 5: Title contains query (but doesn't start with it)
     if (aTitleContains && !bTitleContains) return -1;
     if (!aTitleContains && bTitleContains) return 1;
     
-    // Priority 3: Director matches
+    // Priority 6: Director matches
     if (aDirectorMatch && !bDirectorMatch) return -1;
     if (!aDirectorMatch && bDirectorMatch) return 1;
     
-    // Priority 4: Hybrid score
+    // Priority 7: Hybrid score
     return b.hybridScore - a.hybridScore;
   });
 
@@ -149,7 +195,9 @@ exports.searchMovies = catchAsync(async (req, res) => {
     success: true,
     data: {
       movies: result.data,
-      pagination: result.pagination
+      pagination: result.pagination,
+      userFavoriteGenre: userFavoriteGenre,
+      personalized: userId ? true : false
     }
   });
 });
