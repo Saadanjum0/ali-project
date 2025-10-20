@@ -250,7 +250,8 @@ exports.getTrendingMovies = catchAsync(async (req, res) => {
     userWatchedMovies = watchedMovies.map(w => w.movieId.toString());
   }
 
-  const trending = await WatchHistory.aggregate([
+  // Build aggregation pipeline
+  const pipeline = [
     // Stage 1: Filter last 30 days
     {
       $match: {
@@ -295,14 +296,15 @@ exports.getTrendingMovies = catchAsync(async (req, res) => {
           }
         }
       }
-    },
-    // Stage 6: Filter out movies already watched by user
-    {
-      $match: {
-        isWatchedByUser: 0
-      }
-    },
-    // Stage 7: Project fields
+    }
+  ];
+
+  // Add filter for watched movies only if user is provided and we have enough unwatched movies
+  // We'll handle this differently to ensure we always get 5 movies
+
+  // Add remaining stages
+  pipeline.push(
+    // Project fields
     {
       $project: {
         _id: '$movie._id',
@@ -319,16 +321,19 @@ exports.getTrendingMovies = catchAsync(async (req, res) => {
         genreMatch: 1
       }
     },
-    // Stage 8: Sort by genre match first, then watch count
+    // Sort by genre match first, then unwatched movies, then watch count
     { 
       $sort: { 
         genreMatch: -1,
+        isWatchedByUser: 1,  // 0 (unwatched) comes before 1 (watched)
         watchCount: -1 
       } 
     },
-    // Stage 9: Limit to top 5
+    // Limit to top 5
     { $limit: 5 }
-  ]);
+  );
+
+  const trending = await WatchHistory.aggregate(pipeline);
 
   res.status(200).json({
     success: true,
