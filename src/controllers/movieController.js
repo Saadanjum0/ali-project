@@ -334,45 +334,7 @@ exports.getTrendingMovies = catchAsync(async (req, res) => {
     { $limit: 20 }
   );
 
-  let trending = await WatchHistory.aggregate(pipeline);
-
-  // If we don't have enough trending movies from watch history, supplement with popular movies
-  if (trending.length < 20) {
-    const Movie = require('../models/Movie');
-    const popularMovies = await Movie.find({})
-      .sort({ watchCount: -1, rating: -1 })
-      .limit(20 - trending.length)
-      .lean();
-
-    // Convert popular movies to trending format
-    const popularTrending = popularMovies.map(movie => ({
-      _id: movie._id,
-      title: movie.title,
-      posterUrl: movie.posterUrl,
-      rating: movie.rating,
-      genres: movie.genres,
-      releaseYear: movie.releaseYear,
-      watchCount: movie.watchCount || 0,
-      uniqueViewers: 1,
-      avgWatchTime: 0,
-      genreMatch: userFavoriteGenre && movie.genres && movie.genres.includes(userFavoriteGenre) ? 1 : 0
-    }));
-
-    // Combine trending and popular movies, removing duplicates
-    const trendingIds = new Set(trending.map(m => m._id.toString()));
-    const uniquePopular = popularTrending.filter(m => !trendingIds.has(m._id.toString()));
-    
-    trending = [...trending, ...uniquePopular];
-    
-    // Re-sort the combined list
-    trending.sort((a, b) => {
-      if (a.genreMatch !== b.genreMatch) return b.genreMatch - a.genreMatch;
-      return b.watchCount - a.watchCount;
-    });
-    
-    // Limit to 20
-    trending = trending.slice(0, 20);
-  }
+  const trending = await WatchHistory.aggregate(pipeline);
 
   res.status(200).json({
     success: true,

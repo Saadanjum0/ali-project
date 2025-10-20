@@ -9,6 +9,7 @@
         "process-data": "node src/scripts/processDataset.js",
         "process-full": "node src/scripts/processFullDataset.js",
         "create-sample": "node src/scripts/createSampleData.js",
+        "generate-watch-history": "node src/scripts/generateWatchHistory.js",
         "seed": "node src/config/seed.js",
         "test": "node tests/api.test.js"
     },
