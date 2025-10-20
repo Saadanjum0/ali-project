@@ -206,8 +206,8 @@ async function processFullDataset() {
           return;
         }
         
-        // Limit to first 500 movies for performance
-        if (movies.length >= 500) {
+        // Limit to first 2000 movies for performance and demo purposes
+        if (movies.length >= 2000) {
           return;
         }
         
