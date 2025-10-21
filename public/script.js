@@ -550,19 +550,12 @@ async function addToWatched() {
 
   const watchDuration = document.getElementById('watchDuration').value;
   const completionPercentage = document.getElementById('completionPercentage').value;
-  const rating = document.getElementById('watchRating').value;
-  const reviewText = document.getElementById('watchReviewText').value.trim();
 
   if (!watchDuration || !completionPercentage) {
     showToast('Please fill in watch duration and completion percentage', 'error');
     return;
   }
 
-  // Validate rating if provided
-  if (rating && (rating < 1 || rating > 10)) {
-    showToast('Rating must be between 1 and 10', 'error');
-    return;
-  }
 
   showLoading();
 
@@ -572,14 +565,6 @@ async function addToWatched() {
       watchDuration: parseInt(watchDuration),
       completionPercentage: parseInt(completionPercentage)
     };
-
-    // Add review data if provided
-    if (rating) {
-      requestBody.rating = parseInt(rating);
-    }
-    if (reviewText) {
-      requestBody.reviewText = reviewText;
-    }
 
     const response = await apiRequest(`/users/${currentUserId}/watch`, {
       method: 'POST',
@@ -594,8 +579,6 @@ async function addToWatched() {
     // Clear form
     document.getElementById('watchDuration').value = '';
     document.getElementById('completionPercentage').value = '';
-    document.getElementById('watchRating').value = '';
-    document.getElementById('watchReviewText').value = '';
     
     // Refresh history if on history tab
     if (document.querySelector('[data-tab="history"]').classList.contains('active')) {
@@ -628,8 +611,6 @@ document.querySelector('.close').addEventListener('click', () => {
   // Clear watch form
   document.getElementById('watchDuration').value = '';
   document.getElementById('completionPercentage').value = '';
-  document.getElementById('watchRating').value = '';
-  document.getElementById('watchReviewText').value = '';
 });
 
 window.addEventListener('click', (e) => {

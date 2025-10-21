@@ -54,6 +54,11 @@ movieSchema.index({ title: 'text', director: 'text', 'cast.name': 'text' });
 // Compound index for sorting by rating and popularity
 movieSchema.index({ rating: -1, watchCount: -1 });
 
+// Individual indexes for faster regex searches
+movieSchema.index({ title: 1 });
+movieSchema.index({ director: 1 });
+movieSchema.index({ genres: 1 });
+
 // Virtual for average review rating (populated later)
 movieSchema.virtual('averageReviewRating', {
   ref: 'Review',

@@ -46,49 +46,32 @@ exports.searchMovies = catchAsync(async (req, res) => {
     }
   }
 
-  // Build search query with filters integrated - STRICT matching
+  // Build search query with filters integrated - OPTIMIZED for speed
   const searchQuery = {
-    $and: [
-      // Text search - STRICT substring matching only
-      {
-        $or: [
-          { title: new RegExp(query, 'i') },
-          { director: new RegExp(query, 'i') },
-          { 'cast.name': new RegExp(query, 'i') }
-        ]
-      }
+    $or: [
+      { title: new RegExp(query, 'i') },
+      { director: new RegExp(query, 'i') },
+      { 'cast.name': new RegExp(query, 'i') }
     ]
   };
 
   // Add genre filter if specified
   if (genre) {
-    searchQuery.$and.push({
-      genres: { $in: [new RegExp(genre, 'i')] }
-    });
+    searchQuery.genres = new RegExp(genre, 'i');
   }
 
   // Add rating filter if specified
   if (minRating) {
-    searchQuery.$and.push({
-      rating: { $gte: parseFloat(minRating) }
-    });
+    searchQuery.rating = { $gte: parseFloat(minRating) };
   }
 
-  // Perform search with all filters
-  let movies = await Movie.find(searchQuery).lean();
+  // Perform search with LIMIT to improve speed - only get top 100 matches
+  let movies = await Movie.find(searchQuery)
+    .limit(100)
+    .lean();
 
-  // Post-process to ensure strict substring matching
+  // Define queryLower for use in sorting and highlighting
   const queryLower = query.toLowerCase();
-  movies = movies.filter(movie => {
-    // Check if query appears in title, director, or cast names
-    const titleMatch = movie.title.toLowerCase().includes(queryLower);
-    const directorMatch = movie.director && movie.director.toLowerCase().includes(queryLower);
-    const castMatch = movie.cast && movie.cast.some(cast => 
-      cast.name && cast.name.toLowerCase().includes(queryLower)
-    );
-    
-    return titleMatch || directorMatch || castMatch;
-  });
 
   // Calculate hybrid scores for each movie first
   const weights = {
@@ -112,7 +95,6 @@ exports.searchMovies = catchAsync(async (req, res) => {
 
   // Sort by relevance: user's favorite genre, title starts with query, title contains query, director, cast, then hybrid score
   moviesWithScores.sort((a, b) => {
-    const queryLower = query.toLowerCase();
     
     // Check for user's favorite genre match
     const aFavoriteGenre = userFavoriteGenre && a.genres && a.genres.includes(userFavoriteGenre);
