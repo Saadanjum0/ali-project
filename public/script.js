@@ -1,5 +1,5 @@
 // API Configuration
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = `${window.location.origin.replace(/\/$/, '')}/api`;
 
 // State Management
 let currentMovieId = null;
@@ -48,6 +48,11 @@ function showToast(message, type = 'success') {
   setTimeout(() => {
     toast.classList.remove('show');
   }, 3000);
+}
+
+// Image helper - images are now stored as base64 in MongoDB
+function getImageSrc(url) {
+  return url || '';
 }
 
 function formatDate(dateString) {
@@ -214,7 +219,7 @@ function displaySearchResults(movies, userFavoriteGenre, personalized) {
   const moviesHtml = movies.map(movie => `
     <div class="movie-card" onclick="showMovieDetails('${movie._id}')">
       ${movie.posterUrl 
-        ? `<img src="${movie.posterUrl}" alt="${movie.title}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+        ? `<img src="${getImageSrc(movie.posterUrl)}" alt="${movie.title}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
            <div class="placeholder-img" style="display:none;">🎬</div>`
         : `<div class="placeholder-img">🎬</div>`
       }
@@ -286,7 +291,7 @@ function displayTrendingMovies(movies, userFavoriteGenre, filteredOutWatched) {
       <div class="movie-card" onclick="showMovieDetails('${movie._id}')">
         ${isRecommended ? '<div class="trending-badge recommended">⭐ Recommended</div>' : `<div class="trending-badge">#${index + 1}</div>`}
         ${movie.posterUrl 
-          ? `<img src="${movie.posterUrl}" alt="${movie.title}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+          ? `<img src="${getImageSrc(movie.posterUrl)}" alt="${movie.title}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
              <div class="placeholder-img" style="display:none;">🎬</div>`
           : `<div class="placeholder-img">🎬</div>`
         }
@@ -379,7 +384,7 @@ function displayUserHistory(history) {
   historyList.innerHTML = history.map(item => `
     <div class="history-item">
       ${item.movie?.posterUrl 
-        ? `<img src="${item.movie.posterUrl}" alt="${item.movie?.title}">`
+        ? `<img src="${getImageSrc(item.movie.posterUrl)}" alt="${item.movie?.title}">`
         : `<div style="width:100px;height:150px;background:#333;display:flex;align-items:center;justify-content:center;border-radius:5px;">🎬</div>`
       }
       <div class="history-details">
@@ -447,7 +452,7 @@ function displayMovieDetails(movie) {
   movieDetails.innerHTML = `
     <div>
       ${movie.posterUrl 
-        ? `<img src="${movie.posterUrl}" alt="${movie.title}">`
+        ? `<img src="${getImageSrc(movie.posterUrl)}" alt="${movie.title}">`
         : `<div class="placeholder-img">🎬</div>`
       }
     </div>

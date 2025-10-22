@@ -51,7 +51,10 @@ function generateRandomMovie() {
     releaseYear: year,
     rating: parseFloat(rating),
     duration,
-    cast: getRandomElements(firstNames, 3).map(name => name + ' ' + getRandomElement(lastNames)),
+    cast: getRandomElements(firstNames, 3).map(firstName => ({
+      name: firstName + ' ' + getRandomElement(lastNames),
+      role: 'Actor'
+    })),
     director: getRandomElement(firstNames) + ' ' + getRandomElement(lastNames),
     posterUrl: `https://via.placeholder.com/300x450/0066cc/ffffff?text=${encodeURIComponent(title)}`,
     trailerUrl: `https://example.com/trailer/${Math.random().toString(36).substr(2, 9)}`,
@@ -79,23 +82,24 @@ function generateRandomReview(movieId, userId) {
   return {
     movieId,
     userId,
-    rating: Math.floor(Math.random() * 5) + 1,
+    rating: Math.floor(Math.random() * 10) + 1,
     reviewText: getRandomElement(reviewTexts),
     createdAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000)
   };
 }
 
 function generateRandomWatchHistory(movieId, userId) {
-  const watchProgress = Math.random();
-  const isCompleted = watchProgress > 0.8;
-  
+  const watchDuration = 30 + Math.floor(Math.random() * 150); // 30-180 minutes
+  const completionPercentage = Math.min(100, Math.max(0, Math.floor(Math.random() * 100)));
+  const timestamp = new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000);
+
   return {
     userId,
     movieId,
-    watchProgress,
-    isCompleted,
-    lastWatchedAt: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000),
-    createdAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000)
+    watchDuration,
+    completionPercentage,
+    timestamp,
+    createdAt: timestamp
   };
 }
 
